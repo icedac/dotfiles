@@ -1,0 +1,24 @@
+#!/usr/bin/env zsh
+# Test Solarized colors in terminal
+
+echo "Solarized Color Test"
+echo "===================="
+
+colors=(
+    "0:black"
+    "124:red" 
+    "64:green"
+    "136:yellow"
+    "33:blue"
+    "125:magenta"
+    "37:cyan"
+    "15:white"
+    "166:orange"
+    "61:violet"
+)
+
+for color in $colors; do
+    num=${color%:*}
+    name=${color#*:}
+    echo -e "\033[38;5;${num}m${name} (${num})\033[0m"
+done
