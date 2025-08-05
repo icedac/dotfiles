@@ -1,0 +1,17 @@
+
+{
+  "model": "opus",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nohup ~/.claude/hooks/play-sound.sh $CLAUDE_PROJECT_DIR </dev/null >/dev/null 2>&1 &"
+          }
+        ]
+      }
+    ]
+  }
+}
