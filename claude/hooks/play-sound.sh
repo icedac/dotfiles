@@ -14,7 +14,7 @@ elif [ -f "$PROJECT_DIR/hooks/done.mp3" ]; then
     SOUND_FILE="$PROJECT_DIR/hooks/done.mp3"
 else
     # No sound file found, exit silently
-    SOUND_FILE="/System/Library/Sounds/Glass.aiff"
+    exit 0
 fi
 
 # Play sound based on OS
