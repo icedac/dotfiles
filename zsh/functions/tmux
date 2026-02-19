@@ -1,0 +1,120 @@
+# tmux session/window/pane tree view
+tmux-ls() {
+    local session="${1:-}"
+
+    _tmux_get_node_info() {
+        local pane_pid="$1"
+        # 자식 프로세스에서 실제 실행 중인 명령 확인
+        local child_cmd=$(ps -eo pid,ppid,args | awk -v ppid="$pane_pid" '$2==ppid {print $0; exit}')
+        if [[ -z "$child_cmd" ]]; then
+            echo "node|"
+            return
+        fi
+        # gemini/codex 감지
+        if [[ "$child_cmd" == *"/gemini"* || "$child_cmd" == *"gemini "* ]]; then
+            echo "gemini|"
+        elif [[ "$child_cmd" == *"/codex"* || "$child_cmd" == *"codex "* ]]; then
+            echo "codex|"
+        else
+            # 일반 node - 스크립트 이름 추출
+            local script=$(echo "$child_cmd" | sed -E 's/.*node[^ ]* +//' | awk '{print $1}')
+            script="${script##*/}"  # basename
+            echo "node|$script"
+        fi
+    }
+
+    _tmux_format_pane() {
+        local line="$1"
+        local idx cmd ppath title active pane_id pane_pid short_path icon info marker
+
+        idx="${line%%|*}"; line="${line#*|}"
+        cmd="${line%%|*}"; line="${line#*|}"
+        ppath="${line%%|*}"; line="${line#*|}"
+        title="${line%%|*}"; line="${line#*|}"
+        active="${line%%|*}"; line="${line#*|}"
+        pane_id="${line%%|*}"; line="${line#*|}"
+        pane_pid="$line"
+
+        # 경로 축약
+        short_path="${ppath/#$HOME/~}"
+        [[ ${#short_path} -gt 30 ]] && short_path="…/${ppath:t:h}/${ppath:t}"
+
+        icon=""
+        local extra=""
+
+        # node인 경우 실제 실행 중인 프로세스 확인
+        if [[ "$cmd" == "node" ]]; then
+            local node_info=$(_tmux_get_node_info "$pane_pid")
+            local real_cmd="${node_info%%|*}"
+            local script="${node_info#*|}"
+            cmd="$real_cmd"
+            [[ -n "$script" ]] && extra=" ($script)"
+        fi
+
+        # 이모지 설정
+        case "$cmd" in
+            claude) icon="🤖 " ;;
+            gemini) icon="🐕 " ;;
+            codex)  icon="🐱 " ;;
+            node)   icon="📦 " ;;
+        esac
+
+        info="$cmd$extra $short_path"
+
+        # AI 도구인 경우 타이틀 추가
+        if [[ "$cmd" == "claude" || "$cmd" == "gemini" || "$cmd" == "codex" ]]; then
+            if [[ -n "$title" ]]; then
+                # spinner 문자 제거
+                title="${title#⠋ }"; title="${title#⠙ }"; title="${title#⠹ }"; title="${title#⠸ }"
+                title="${title#⠼ }"; title="${title#⠴ }"; title="${title#⠦ }"; title="${title#⠧ }"
+                title="${title#⠇ }"; title="${title#⠏ }"; title="${title#⠐ }"; title="${title#⠂ }"; title="${title#⠈ }"
+                [[ -n "$title" ]] && info="$cmd \"$title\" $short_path"
+            fi
+        fi
+
+        marker=""
+        [[ "$active" == "1" ]] && marker=" *"
+        printf "    └─ %s: %s%s%s [%s]\n" "$idx" "$icon" "$info" "$marker" "$pane_id"
+    }
+
+    _tmux_show_session() {
+        local sess="$1" win_list pane_list win pane
+        printf "📦 %s\n" "$sess"
+        win_list=$(tmux list-windows -t "$sess" -F "#{window_index}:#{window_name}")
+        for win in ${(f)win_list}; do
+            printf "  📁 %s\n" "$win"
+            pane_list=$(tmux list-panes -t "$sess:${win%%:*}" -F "#{pane_index}|#{pane_current_command}|#{pane_current_path}|#{pane_title}|#{pane_active}|#{pane_id}|#{pane_pid}")
+            for pane in ${(f)pane_list}; do
+                _tmux_format_pane "$pane"
+            done
+        done
+    }
+
+    if [[ -z "$session" ]]; then
+        local sess_list sess
+        sess_list=$(tmux list-sessions -F "#{session_name}" 2>/dev/null)
+        for sess in ${(f)sess_list}; do
+            _tmux_show_session "$sess"
+        done
+    else
+        if ! tmux has-session -t "$session" 2>/dev/null; then
+            echo "Session '$session' not found"
+            return 1
+        fi
+        _tmux_show_session "$session"
+    fi
+    echo ""
+    echo "💡 Kill: tmux-kill %ID [%ID2 ...]"
+}
+
+# tmux kill pane shortcut
+tmux-kill() {
+    if [[ -z "$1" ]]; then
+        echo "Usage: tmux-kill %ID [%ID2 ...]"
+        return 1
+    fi
+    local p
+    for p in "$@"; do
+        tmux kill-pane -t "$p" && echo "Killed $p" || echo "Failed to kill $p"
+    done
+}

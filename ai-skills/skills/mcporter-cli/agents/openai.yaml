@@ -1,0 +1,4 @@
+interface:
+  display_name: "MCPorter CLI"
+  short_description: "Run MCP calls and tooling with MCPorter"
+  default_prompt: "Use MCPorter to list MCP servers, authenticate if needed, and run calls with shell-safe command patterns."
